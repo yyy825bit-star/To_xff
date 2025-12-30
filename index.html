@@ -188,13 +188,12 @@
          * 1. 音乐播放与分析系统
          * ==========================================
          */
-        // 📢 请确保 MP3 文件在同一目录下
         const playlist = [
-            'zdnygj.mp3',
-            'What_is_Love.mp3',
-            'ezj.mp3',
-            'some.mp3',
-            'Crush.mp3'
+            'music/zdnygj.mp3',
+            'music/What_is_Love.mp3',
+            'music/ezj.mp3',
+            'music/some.mp3',
+            'music/Crush.mp3'
         ];
 
         let trackIndex = 0;
@@ -208,7 +207,7 @@
             if (!audioCtx) {
                 audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 analyser = audioCtx.createAnalyser();
-                analyser.fftSize = 512; // 提高采样精度
+                analyser.fftSize = 512; 
                 source = audioCtx.createMediaElementSource(audio);
                 source.connect(analyser);
                 analyser.connect(audioCtx.destination);
@@ -247,29 +246,20 @@
             document.getElementById('songTitle').innerText = "🎵 " + name;
         }
 
-        // 获取低音能量值 (0 ~ 1) - 用于驱动心跳
         function getBassEnergy() {
             if (!analyser) return 0;
             analyser.getByteFrequencyData(dataArray);
-            
-            // 抓取低频段 (Bass)
             let sum = 0;
-            for (let i = 0; i < 20; i++) {
-                sum += dataArray[i];
-            }
+            for (let i = 0; i < 20; i++) sum += dataArray[i];
             let avg = sum / 20;
-            
-            // 可视化条
             document.getElementById('beatVis').style.width = (avg / 2.55) + "%";
-            
-            // 返回归一化数值，并做一点指数增强，让重音更明显
             let val = avg / 255;
-            return val * val; // 平方曲线，让弱音更弱，强音更强
+            return val * val; 
         }
 
         /**
          * ==========================================
-         * 2. 高级 3D 粒子引擎
+         * 2. 高级 3D 粒子引擎 (优化版 - 动态渐变)
          * ==========================================
          */
         const canvas = document.getElementById('canvas');
@@ -278,12 +268,9 @@
         let width, height;
         let particles = [];
         
-        // 核心参数
-        const PARTICLE_COUNT = 1800; // 粒子数量
-        const HEART_SIZE = 15;       // 爱心基础大小
-        const COLORS = ['#ff758c', '#ff7eb3', '#ffa585', '#ffffff', '#c21500'];
+        const PARTICLE_COUNT = 1800; 
+        const HEART_SIZE = 15;       
 
-        // 初始化画布
         function resize() {
             width = canvas.width = window.innerWidth;
             height = canvas.height = window.innerHeight;
@@ -291,44 +278,19 @@
         window.addEventListener('resize', resize);
         resize();
 
-        // 隐藏 loading
         setTimeout(() => {
             const load = document.getElementById('loading');
             load.style.opacity = 0;
             setTimeout(() => load.style.display = 'none', 500);
         }, 800);
 
-        /**
-         * 💖 3D 爱心数学生成器
-         * 使用球坐标系 + 爱心方程
-         */
         function getHeartPoint() {
-            // 随机角度
-            let u = Math.random() * Math.PI * 2;
-            let v = Math.random() * Math.PI;
-            
-            // 另一种更加饱满的爱心方程 (3D Heart Surface)
-            // x = 16sin^3(t)
-            // y = 13cos(t) - 5cos(2t) - 2cos(3t) - cos(4t)
-            // z = 扩充厚度
-            
-            // 这里使用更适合粒子云的随机分布算法
             let t = Math.random() * Math.PI * 2;
-            
-            // 2D 基础轮廓
             let x = 16 * Math.pow(Math.sin(t), 3);
             let y = -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t));
-            
-            // Z 轴厚度：中心厚，边缘薄，并加入随机散射
-            // 这里的数学 trick 是让 Z 随 x,y 的收缩而收缩
-            let scale = Math.random(); // 内部填充
-            // 让爱心看起来有体积
+            let scale = Math.random(); 
             let z = (Math.random() - 0.5) * 10 * scale; 
-            
-            // 稍微让 x, y 也随机一点，填满内部
-            // 使用 sqrt(scale) 让粒子更聚集在表面
             let s = Math.sqrt(Math.random()); 
-            
             return {
                 x: x * s,
                 y: y * s,
@@ -339,7 +301,6 @@
         class Particle {
             constructor() {
                 this.reset();
-                // 初始随机位置，做入场动画
                 this.y = Math.random() * height;
             }
 
@@ -353,104 +314,107 @@
                 this.y = this.originY;
                 this.z = this.originZ;
 
-                this.size = Math.random() * 2 + 0.5; // 粒子大小
-                this.color = COLORS[Math.floor(Math.random() * COLORS.length)];
+                this.size = Math.random() * 2 + 0.5; 
                 
-                // 闪烁参数
+                this.baseHue = 340; // 基础色相：粉色
+                
                 this.alpha = Math.random();
                 this.fadeSpeed = Math.random() * 0.02 + 0.005;
+                this.phase = Math.random() * Math.PI * 2; 
+                
+                // 添加动态渐变相关属性
+                this.huePhase = Math.random() * Math.PI * 2; // 用于色相变化
+                this.lightPhase = Math.random() * Math.PI * 2; // 用于亮度变化
             }
 
-            update(beat, rotationY) {
-                // 1. 旋转逻辑 (绕Y轴)
-                // 3D 旋转矩阵公式
-                // x' = x*cos - z*sin
-                // z' = x*sin + z*cos
+            update(beat, rotationY, time) {
                 const cos = Math.cos(rotationY);
                 const sin = Math.sin(rotationY);
-
-                // 2. 心跳膨胀逻辑
-                // 当 bass 重音出现时，beat 值大，粒子向外扩散
-                // 使用 origin 坐标作为基准方向
-                const beatScale = 1 + (beat * 0.8); // 放大倍数，最大 1.8 倍
+                const beatScale = 1 + (beat * 0.8); 
 
                 let tx = this.originX * beatScale;
                 let ty = this.originY * beatScale;
                 let tz = this.originZ * beatScale;
 
-                // 应用旋转
                 let rx = tx * cos - tz * sin;
                 let rz = tx * sin + tz * cos;
                 let ry = ty;
 
-                // 3. 3D 透视投影 (Perspective Projection)
-                // focalLength 焦距
                 const f = 400; 
-                // z 轴偏移，把模型推远一点，不然会糊在脸上
                 const zOffset = rz + f; 
                 
                 if (zOffset > 0) {
                     const projection = f / zOffset;
                     this.screenX = width / 2 + rx * projection;
                     this.screenY = height / 2 + ry * projection;
-                    this.screenScale = projection; // 远小近大
+                    this.screenScale = projection; 
+                    
+                    this.depthRatio = (rz + 20) / 40; 
+                    
                     this.visible = true;
                 } else {
                     this.visible = false;
                 }
 
-                // 闪烁更新
-                this.alpha += this.fadeSpeed;
-                if (this.alpha > 1 || this.alpha < 0.2) this.fadeSpeed *= -1;
+                // 闪烁与呼吸
+                this.alpha = 0.3 + Math.abs(Math.sin(time + this.phase)) * 0.7;
+                
+                // 更新动态渐变参数
+                this.currentHue = this.baseHue + Math.sin(time * 0.5 + this.huePhase) * 20;
+                this.currentLightness = 50 + Math.sin(time * 0.7 + this.lightPhase) * 10 + (this.screenScale * 20);
             }
 
-            draw(ctx) {
+            draw(ctx, time) {
                 if (!this.visible) return;
 
-                ctx.globalAlpha = this.alpha;
-                ctx.fillStyle = this.color;
-                
-                // 根据距离调整大小
-                let s = this.size * this.screenScale;
-                
+                let r = this.size * this.screenScale * 1.5; 
+                if (r < 0.1) return;
+
+                const gradient = ctx.createRadialGradient(
+                    this.screenX, this.screenY, 0, 
+                    this.screenX, this.screenY, r,
+                    this.screenX, this.screenY, r * 1.5 // 扩展渐变范围
+                );
+
+                // 动态渐变：中心亮色 -> 中间主体色 -> 边缘透明
+                gradient.addColorStop(0, `hsla(${this.currentHue}, 100%, 90%, ${this.alpha})`);
+                gradient.addColorStop(0.4, `hsla(${this.currentHue}, 80%, ${this.currentLightness}%, ${this.alpha * 0.8})`);
+                gradient.addColorStop(0.7, `hsla(${this.currentHue + 10}, 70%, ${this.currentLightness - 10}%, ${this.alpha * 0.4})`);
+                gradient.addColorStop(1, `hsla(${this.currentHue + 20}, 60%, 30%, 0)`);
+
+                ctx.fillStyle = gradient;
                 ctx.beginPath();
-                ctx.arc(this.screenX, this.screenY, s, 0, Math.PI * 2);
+                ctx.arc(this.screenX, this.screenY, r, 0, Math.PI * 2);
                 ctx.fill();
             }
         }
 
-        // 初始化粒子
         for (let i = 0; i < PARTICLE_COUNT; i++) {
             particles.push(new Particle());
         }
 
-        // 动画循环
         let rotationAngle = 0;
+        let time = 0;
         
         function animate() {
-            // 拖尾效果，让运动更丝滑
-            // 使用深色半透明遮罩
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.15)'; // 这里的透明度决定拖尾长度，越小越长
+            time += 0.02; 
+
+            // 拖尾遮罩
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)'; 
             ctx.fillRect(0, 0, width, height);
 
-            // 获取音乐能量
             const beat = getBassEnergy();
-            
-            // 自动旋转 + 音乐加速旋转
             rotationAngle += 0.005 + (beat * 0.02);
 
-            // 更新绘制所有粒子
-            // 关键：按 Z 轴深度排序，确保遮挡关系正确（虽然粒子很小影响不大，但排序后更有质感）
-            // 这里为了性能略去排序，因为 additive blending 效果更好
-            
-            ctx.globalCompositeOperation = 'lighter'; // 叠加模式，让重叠粒子发光
+            // 叠加模式
+            ctx.globalCompositeOperation = 'lighter'; 
 
             particles.forEach(p => {
-                p.update(beat, rotationAngle);
-                p.draw(ctx);
+                p.update(beat, rotationAngle, time);
+                p.draw(ctx, time); // 传递时间参数
             });
 
-            ctx.globalCompositeOperation = 'source-over'; // 恢复默认
+            ctx.globalCompositeOperation = 'source-over'; 
 
             requestAnimationFrame(animate);
         }
