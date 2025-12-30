@@ -188,19 +188,21 @@
          * 1. 音乐播放与分析系统
          * ==========================================
          */
+        // 根据您的文件结构修改路径
         const playlist = [
-            'music/zdnygj.mp3',
-            'music/What_is_Love.mp3',
-            'music/ezj.mp3',
-            'music/some.mp3',
-            'music/Crush.mp3'
+            './music/zdnygj.mp3',
+            './music/What_is_Love.mp3',
+            './music/ezj.mp3',
+            './music/some.mp3',
+            './music/Crush.mp3'
         ];
 
         let trackIndex = 0;
         let isPlaying = false;
         let audioCtx, analyser, source;
         const audio = new Audio();
-        audio.crossOrigin = "anonymous";
+        // 移除 crossOrigin 属性以避免 CORS 问题
+        // audio.crossOrigin = "anonymous";
         let dataArray;
 
         function initAudio() {
@@ -213,7 +215,13 @@
                 analyser.connect(audioCtx.destination);
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
             }
-            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume().then(() => {
+                    console.log('Audio context resumed');
+                }).catch(e => {
+                    console.error('Audio context resume failed:', e);
+                });
+            }
         }
 
         function toggleMusic() {
@@ -225,36 +233,61 @@
                 btn.innerText = "▶";
                 btn.classList.remove('play-active');
             } else {
-                if (!audio.src) audio.src = playlist[trackIndex];
-                audio.play().catch(e => console.log("播放需要交互:", e));
-                btn.innerText = "⏸";
-                btn.classList.add('play-active');
-                updateTitle();
+                if (!audio.src) {
+                    audio.src = playlist[trackIndex];
+                }
+                audio.play()
+                    .then(() => {
+                        console.log('Playback started successfully');
+                        btn.innerText = "⏸";
+                        btn.classList.add('play-active');
+                        updateTitle();
+                        isPlaying = true;
+                    })
+                    .catch(e => {
+                        console.error('Playback failed:', e);
+                        // 显示错误信息
+                        document.getElementById('songTitle').innerText = "❌ 播放失败，请检查文件";
+                    });
             }
-            isPlaying = !isPlaying;
         }
 
         function nextMusic() {
             trackIndex = (trackIndex + 1) % playlist.length;
             audio.src = playlist[trackIndex];
-            if (isPlaying) audio.play();
-            updateTitle();
+            if (isPlaying) {
+                audio.play()
+                    .then(() => {
+                        updateTitle();
+                    })
+                    .catch(e => {
+                        console.error('Next track failed:', e);
+                        document.getElementById('songTitle').innerText = "❌ 播放失败，请检查文件";
+                    });
+            } else {
+                updateTitle();
+            }
         }
 
         function updateTitle() {
-            const name = playlist[trackIndex];
+            const name = playlist[trackIndex].split('/').pop(); // 获取文件名
             document.getElementById('songTitle').innerText = "🎵 " + name;
         }
 
         function getBassEnergy() {
             if (!analyser) return 0;
-            analyser.getByteFrequencyData(dataArray);
-            let sum = 0;
-            for (let i = 0; i < 20; i++) sum += dataArray[i];
-            let avg = sum / 20;
-            document.getElementById('beatVis').style.width = (avg / 2.55) + "%";
-            let val = avg / 255;
-            return val * val; 
+            try {
+                analyser.getByteFrequencyData(dataArray);
+                let sum = 0;
+                for (let i = 0; i < 20; i++) sum += dataArray[i];
+                let avg = sum / 20;
+                document.getElementById('beatVis').style.width = (avg / 2.55) + "%";
+                let val = avg / 255;
+                return val * val; 
+            } catch(e) {
+                console.warn('Analyser error:', e);
+                return 0;
+            }
         }
 
         /**
